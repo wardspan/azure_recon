@@ -14,6 +14,7 @@ class AuthStatus(BaseModel):
     tenant_id: Optional[str] = None
     user_id: Optional[str] = None
     expires_at: Optional[datetime] = None
+    expires_in_minutes: Optional[int] = None
     error: Optional[str] = None
 
 class PasswordLoginRequest(BaseModel):
@@ -96,6 +97,21 @@ class ComplianceResult(BaseModel):
     resource_type: str
     resource_location: str
 
+class IdentityRoleAssignment(BaseModel):
+    principal_id: str
+    principal_name: Optional[str] = None
+    principal_type: str
+    role_definition_name: str
+    scope: str
+    subscription_id: Optional[str] = None
+
+class IdentityScanResult(BaseModel):
+    users: List[IdentityRoleAssignment]
+    service_principals: List[IdentityRoleAssignment]
+    managed_identities: List[IdentityRoleAssignment]
+    groups: List[IdentityRoleAssignment]
+    unknown_or_deleted: List[IdentityRoleAssignment]
+
 class ScanResult(BaseModel):
     tenant_id: str
     scan_timestamp: datetime
@@ -107,6 +123,7 @@ class ScanResult(BaseModel):
     role_assignments: List[RoleAssignment]
     policy_assignments: List[PolicyAssignment]
     compliance_results: List[ComplianceResult]
+    identity_summary: Optional[Dict[str, Any]] = {}
 
 class ReportRequest(BaseModel):
     format: str  # "markdown" or "pdf"

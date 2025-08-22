@@ -19,6 +19,7 @@ export interface AuthStatus {
   tenant_id?: string
   user_id?: string
   expires_at?: string
+  expires_in_minutes?: number
   error?: string
 }
 
@@ -138,6 +139,7 @@ export interface ScanResult {
   role_assignments: RoleAssignment[]
   policy_assignments: PolicyAssignment[]
   compliance_results: ComplianceResult[]
+  identity_summary?: Record<string, { count: number; roles: Record<string, number> }>
 }
 
 export interface Subscription {
@@ -145,6 +147,23 @@ export interface Subscription {
   display_name: string
   state: string
   tenant_id: string
+}
+
+export interface IdentityRoleAssignment {
+  principal_id: string
+  principal_name?: string
+  principal_type: string
+  role_definition_name: string
+  scope: string
+  subscription_id?: string
+}
+
+export interface IdentityScanResult {
+  users: IdentityRoleAssignment[]
+  service_principals: IdentityRoleAssignment[]
+  managed_identities: IdentityRoleAssignment[]
+  groups: IdentityRoleAssignment[]
+  unknown_or_deleted: IdentityRoleAssignment[]
 }
 
 // API functions
@@ -169,6 +188,9 @@ export const scanApi = {
   runFullScan: (): Promise<ScanResult> => api.post('/scan').then(res => res.data),
 
   getLatestScan: (): Promise<ScanResult | null> => api.get('/scan/latest').then(res => res.data),
+
+  getIdentityScan: (): Promise<IdentityScanResult> =>
+    api.get('/scan/identity').then(res => res.data),
 
   getSubscriptions: (): Promise<Subscription[]> => api.get('/subscriptions').then(res => res.data),
 }

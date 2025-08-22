@@ -14,11 +14,14 @@ from exposure import exposure_analyzer
 from identity import identity_analyzer
 from policy import policy_analyzer
 from reporting import report_generator
+from role_analysis import summarize_identity_roles, role_analyzer, get_detailed_identity_roles
 from models import (
     AuthResponse, AuthStatus, ScanResult, ReportRequest,
     SecureScoreData, Recommendation, PublicResource, 
     NetworkSecurityGroup, UserInfo, RoleAssignment,
-    PolicyAssignment, ComplianceResult, Subscription, PasswordLoginRequest, ServicePrincipalLoginRequest
+    PolicyAssignment, ComplianceResult, Subscription, 
+    PasswordLoginRequest, ServicePrincipalLoginRequest,
+    IdentityScanResult, IdentityRoleAssignment
 )
 
 # Configure logging
@@ -117,10 +120,17 @@ async def complete_authentication():
 async def get_auth_status():
     """Get current authentication status"""
     try:
+        expires_in_minutes = None
+        if azure_auth.expires_at:
+            from datetime import datetime
+            expires_in_seconds = (azure_auth.expires_at - datetime.now()).total_seconds()
+            expires_in_minutes = max(0, int(expires_in_seconds / 60))
+        
         return AuthStatus(
             authenticated=azure_auth.is_authenticated(),
             tenant_id=azure_auth.tenant_id,
-            expires_at=azure_auth.expires_at
+            expires_at=azure_auth.expires_at,
+            expires_in_minutes=expires_in_minutes
         )
     except Exception as e:
         logger.error(f"Error getting auth status: {str(e)}")
@@ -167,6 +177,7 @@ async def run_full_scan(background_tasks: BackgroundTasks):
         role_assignments_task = identity_analyzer.get_role_assignments(subscription_ids)
         policy_assignments_task = policy_analyzer.get_policy_assignments(subscription_ids)
         compliance_results_task = policy_analyzer.get_compliance_results(subscription_ids)
+        identity_summary_task = summarize_identity_roles(subscription_ids)
         
         # Wait for all tasks to complete
         results = await asyncio.gather(
@@ -178,6 +189,7 @@ async def run_full_scan(background_tasks: BackgroundTasks):
             role_assignments_task,
             policy_assignments_task,
             compliance_results_task,
+            identity_summary_task,
             return_exceptions=True
         )
         
@@ -190,6 +202,7 @@ async def run_full_scan(background_tasks: BackgroundTasks):
         role_assignments = results[5] if not isinstance(results[5], Exception) else []
         policy_assignments = results[6] if not isinstance(results[6], Exception) else []
         compliance_results = results[7] if not isinstance(results[7], Exception) else []
+        identity_summary = results[8] if not isinstance(results[8], Exception) else {}
         
         # Create scan result
         scan_result = ScanResult(
@@ -202,7 +215,8 @@ async def run_full_scan(background_tasks: BackgroundTasks):
             users=users,
             role_assignments=role_assignments,
             policy_assignments=policy_assignments,
-            compliance_results=compliance_results
+            compliance_results=compliance_results,
+            identity_summary=identity_summary
         )
         
         latest_scan_result = scan_result
@@ -344,6 +358,44 @@ async def get_role_assignments():
         logger.error(f"Error getting role assignments: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting role assignments: {str(e)}")
 
+@app.get("/api/identity-summary")
+async def get_identity_summary():
+    """Get identity-type breakdown of all role assignments"""
+    if not azure_auth.is_authenticated():
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        subscriptions = await azure_auth.get_subscriptions()
+        subscription_ids = [sub.subscription_id for sub in subscriptions]
+        identity_breakdown = await summarize_identity_roles(subscription_ids)
+        return identity_breakdown
+    except Exception as e:
+        logger.error(f"Error getting identity summary: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting identity summary: {str(e)}")
+
+@app.get("/api/scan/identity", response_model=IdentityScanResult)
+async def get_identity_scan():
+    """Get detailed role assignments grouped by identity type"""
+    if not azure_auth.is_authenticated():
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        subscriptions = await azure_auth.get_subscriptions()
+        subscription_ids = [sub.subscription_id for sub in subscriptions]
+        detailed_roles = await get_detailed_identity_roles(subscription_ids)
+        
+        # Convert to IdentityScanResult format
+        return IdentityScanResult(
+            users=[IdentityRoleAssignment(**assignment) for assignment in detailed_roles["users"]],
+            service_principals=[IdentityRoleAssignment(**assignment) for assignment in detailed_roles["service_principals"]],
+            managed_identities=[IdentityRoleAssignment(**assignment) for assignment in detailed_roles["managed_identities"]],
+            groups=[IdentityRoleAssignment(**assignment) for assignment in detailed_roles["groups"]],
+            unknown_or_deleted=[IdentityRoleAssignment(**assignment) for assignment in detailed_roles["unknown_or_deleted"]]
+        )
+    except Exception as e:
+        logger.error(f"Error getting identity scan: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting identity scan: {str(e)}")
+
 @app.get("/api/policy", response_model=List[PolicyAssignment])
 async def get_policy():
     """Get policy assignments"""
@@ -398,6 +450,7 @@ async def generate_report(request: ReportRequest):
             role_assignments = await identity_analyzer.get_role_assignments(subscription_ids)
             policy_assignments = await policy_analyzer.get_policy_assignments(subscription_ids)
             compliance_results = await policy_analyzer.get_compliance_results(subscription_ids)
+            identity_summary = await summarize_identity_roles(subscription_ids)
             
             scan_data = ScanResult(
                 tenant_id=azure_auth.tenant_id or "unknown",
@@ -409,7 +462,8 @@ async def generate_report(request: ReportRequest):
                 users=users,
                 role_assignments=role_assignments,
                 policy_assignments=policy_assignments,
-                compliance_results=compliance_results
+                compliance_results=compliance_results,
+                identity_summary=identity_summary
             )
         except Exception as e:
             logger.error(f"Error running scan for report: {str(e)}")
@@ -501,6 +555,7 @@ async def shutdown_event():
         exposure_analyzer.close_clients()
         identity_analyzer.close_clients()
         policy_analyzer.close_clients()
+        role_analyzer.close_clients()
         logger.info("Cleanup completed")
     except Exception as e:
         logger.error(f"Error during cleanup: {str(e)}")

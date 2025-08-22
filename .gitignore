@@ -79,4 +79,6 @@ docker-data/
 .gptcache/
 .copilot/
 .codeium/
+AGENTS.md
+.claude-context
 

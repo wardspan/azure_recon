@@ -1,8 +1,20 @@
 import React, { useState, useEffect } from 'react'
-import { Shield, AlertTriangle, Globe, Users, Play, Download, RefreshCw } from 'lucide-react'
+import {
+  Shield,
+  AlertTriangle,
+  Globe,
+  Users,
+  Play,
+  Download,
+  RefreshCw,
+  BarChart3,
+  UserCheck,
+} from 'lucide-react'
+import { Tab } from '@headlessui/react'
 import { ScoreCard } from '../components/ScoreCard'
 import { DataTable } from '../components/DataTable'
 import { LoadingSpinner } from '../components/LoadingSpinner'
+import { EnhancedIdentityBreakdown } from '../components/EnhancedIdentityBreakdown'
 import { scanApi, reportApi, type ScanResult } from '../services/api'
 
 const Dashboard: React.FC = () => {
@@ -193,139 +205,191 @@ const Dashboard: React.FC = () => {
             </button>
           </div>
 
-          {/* Score Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <ScoreCard
-              title="Secure Score"
-              value={`${scanData.secure_score.percentage.toFixed(1)}%`}
-              subtitle={`${scanData.secure_score.current_score}/${scanData.secure_score.max_score}`}
-              icon={Shield}
-              color={
-                scanData.secure_score.percentage > 70
-                  ? 'green'
-                  : scanData.secure_score.percentage > 40
-                    ? 'yellow'
-                    : 'red'
-              }
-            />
-
-            <ScoreCard
-              title="Critical Issues"
-              value={scanData.recommendations.filter(r => r.severity === 'Critical').length}
-              subtitle="Immediate attention required"
-              icon={AlertTriangle}
-              color="red"
-            />
-
-            <ScoreCard
-              title="Public Resources"
-              value={scanData.public_resources.length}
-              subtitle="Internet-facing assets"
-              icon={Globe}
-              color={
-                scanData.public_resources.length > 10
-                  ? 'red'
-                  : scanData.public_resources.length > 5
-                    ? 'yellow'
-                    : 'green'
-              }
-            />
-
-            <ScoreCard
-              title="Users"
-              value={scanData.users.length}
-              subtitle={`${scanData.users.filter(u => !u.mfa_enabled).length} without MFA`}
-              icon={Users}
-              color={scanData.users.filter(u => !u.mfa_enabled).length > 0 ? 'yellow' : 'green'}
-            />
-          </div>
-
-          {/* Charts Row */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="card">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Recommendations by Severity
-              </h3>
-              <div className="space-y-3">
-                {['Critical', 'High', 'Medium', 'Low'].map(severity => {
-                  const count = scanData.recommendations.filter(r => r.severity === severity).length
-                  const total = scanData.recommendations.length
-                  const percentage = total > 0 ? (count / total) * 100 : 0
-
-                  return (
-                    <div key={severity} className="flex items-center space-x-3">
-                      <span className={`w-16 text-sm severity-${severity.toLowerCase()}`}>
-                        {severity}
-                      </span>
-                      <div className="flex-1 bg-gray-200 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full bg-${getSeverityColor(severity)}-500`}
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                      <span className="text-sm text-gray-600 w-8">{count}</span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div className="card">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Security Metrics</h3>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Policy Compliance</span>
-                  <span className="font-medium">
-                    {scanData.compliance_results.length > 0
-                      ? `${((scanData.compliance_results.filter(c => c.compliance_state === 'Compliant').length / scanData.compliance_results.length) * 100).toFixed(1)}%`
-                      : 'N/A'}
-                  </span>
+          {/* Tabbed Interface */}
+          <Tab.Group>
+            <Tab.List className="flex space-x-1 rounded-xl bg-blue-900/20 p-1">
+              <Tab
+                className={({ selected }) =>
+                  `w-full rounded-lg py-2.5 text-sm font-medium leading-5 text-blue-700
+                ring-white ring-opacity-60 ring-offset-2 ring-offset-blue-400 focus:outline-none focus:ring-2
+                ${
+                  selected
+                    ? 'bg-white shadow'
+                    : 'text-blue-100 hover:bg-white/[0.12] hover:text-white'
+                }`
+                }
+              >
+                <div className="flex items-center justify-center space-x-2">
+                  <BarChart3 className="h-4 w-4" />
+                  <span>Overview</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">High-Risk NSGs</span>
-                  <span className="font-medium text-red-600">
-                    {
-                      scanData.network_security_groups.filter(nsg => nsg.risk_level === 'High')
-                        .length
+              </Tab>
+              <Tab
+                className={({ selected }) =>
+                  `w-full rounded-lg py-2.5 text-sm font-medium leading-5 text-blue-700
+                ring-white ring-opacity-60 ring-offset-2 ring-offset-blue-400 focus:outline-none focus:ring-2
+                ${
+                  selected
+                    ? 'bg-white shadow'
+                    : 'text-blue-100 hover:bg-white/[0.12] hover:text-white'
+                }`
+                }
+              >
+                <div className="flex items-center justify-center space-x-2">
+                  <UserCheck className="h-4 w-4" />
+                  <span>Identity</span>
+                </div>
+              </Tab>
+            </Tab.List>
+            <Tab.Panels className="mt-6">
+              {/* Overview Tab */}
+              <Tab.Panel className="space-y-6">
+                {/* Score Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <ScoreCard
+                    title="Secure Score"
+                    value={`${scanData.secure_score.percentage.toFixed(1)}%`}
+                    subtitle={`${scanData.secure_score.current_score}/${scanData.secure_score.max_score}`}
+                    icon={Shield}
+                    color={
+                      scanData.secure_score.percentage > 70
+                        ? 'green'
+                        : scanData.secure_score.percentage > 40
+                          ? 'yellow'
+                          : 'red'
                     }
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Guest Users</span>
-                  <span className="font-medium text-yellow-600">
-                    {scanData.users.filter(u => u.is_guest).length}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Role Assignments</span>
-                  <span className="font-medium">{scanData.role_assignments.length}</span>
-                </div>
-              </div>
-            </div>
-          </div>
+                  />
 
-          {/* Data Tables */}
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Top Security Recommendations
-              </h3>
-              <DataTable
-                data={scanData.recommendations.slice(0, 10)}
-                columns={recommendationColumns}
-                emptyMessage="No recommendations found"
-              />
-            </div>
+                  <ScoreCard
+                    title="Critical Issues"
+                    value={scanData.recommendations.filter(r => r.severity === 'Critical').length}
+                    subtitle="Immediate attention required"
+                    icon={AlertTriangle}
+                    color="red"
+                  />
 
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Public Resources</h3>
-              <DataTable
-                data={scanData.public_resources}
-                columns={publicResourceColumns}
-                emptyMessage="No public resources found"
-              />
-            </div>
-          </div>
+                  <ScoreCard
+                    title="Public Resources"
+                    value={scanData.public_resources.length}
+                    subtitle="Internet-facing assets"
+                    icon={Globe}
+                    color={
+                      scanData.public_resources.length > 10
+                        ? 'red'
+                        : scanData.public_resources.length > 5
+                          ? 'yellow'
+                          : 'green'
+                    }
+                  />
+
+                  <ScoreCard
+                    title="Users"
+                    value={scanData.users.length}
+                    subtitle={`${scanData.users.filter(u => !u.mfa_enabled).length} without MFA`}
+                    icon={Users}
+                    color={
+                      scanData.users.filter(u => !u.mfa_enabled).length > 0 ? 'yellow' : 'green'
+                    }
+                  />
+                </div>
+
+                {/* Charts Row */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="card">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">
+                      Recommendations by Severity
+                    </h3>
+                    <div className="space-y-3">
+                      {['Critical', 'High', 'Medium', 'Low'].map(severity => {
+                        const count = scanData.recommendations.filter(
+                          r => r.severity === severity
+                        ).length
+                        const total = scanData.recommendations.length
+                        const percentage = total > 0 ? (count / total) * 100 : 0
+
+                        return (
+                          <div key={severity} className="flex items-center space-x-3">
+                            <span className={`w-16 text-sm severity-${severity.toLowerCase()}`}>
+                              {severity}
+                            </span>
+                            <div className="flex-1 bg-gray-200 rounded-full h-2">
+                              <div
+                                className={`h-2 rounded-full bg-${getSeverityColor(severity)}-500`}
+                                style={{ width: `${percentage}%` }}
+                              />
+                            </div>
+                            <span className="text-sm text-gray-600 w-8">{count}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="card">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Security Metrics</h3>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Policy Compliance</span>
+                        <span className="font-medium">
+                          {scanData.compliance_results.length > 0
+                            ? `${((scanData.compliance_results.filter(c => c.compliance_state === 'Compliant').length / scanData.compliance_results.length) * 100).toFixed(1)}%`
+                            : 'N/A'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">High-Risk NSGs</span>
+                        <span className="font-medium text-red-600">
+                          {
+                            scanData.network_security_groups.filter(
+                              nsg => nsg.risk_level === 'High'
+                            ).length
+                          }
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Guest Users</span>
+                        <span className="font-medium text-yellow-600">
+                          {scanData.users.filter(u => u.is_guest).length}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Role Assignments</span>
+                        <span className="font-medium">{scanData.role_assignments.length}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Data Tables */}
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">
+                      Top Security Recommendations
+                    </h3>
+                    <DataTable
+                      data={scanData.recommendations.slice(0, 10)}
+                      columns={recommendationColumns}
+                      emptyMessage="No recommendations found"
+                    />
+                  </div>
+
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Public Resources</h3>
+                    <DataTable
+                      data={scanData.public_resources}
+                      columns={publicResourceColumns}
+                      emptyMessage="No public resources found"
+                    />
+                  </div>
+                </div>
+              </Tab.Panel>
+
+              {/* Identity Tab */}
+              <Tab.Panel>
+                <EnhancedIdentityBreakdown />
+              </Tab.Panel>
+            </Tab.Panels>
+          </Tab.Group>
         </>
       )}
     </div>

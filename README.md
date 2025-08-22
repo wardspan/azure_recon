@@ -1,32 +1,30 @@
-# 🔒 Azure Recon - Security Assessment Tool
+# 🔒 Azure Recon - Identity & Role Analysis Tool
 
-Azure Recon is a comprehensive security posture assessment tool for Microsoft Azure environments. It provides automated security analysis, vulnerability identification, and detailed reporting for Azure tenants using read-only permissions.
+Azure Recon is a security analysis tool focused on Azure identity and role assignment reconnaissance. It provides detailed analysis of identity permissions, role assignments, and access patterns across Azure environments using read-only permissions.
 
 ## ✨ Features
 
-- **🛡️ Microsoft Defender Integration**: Secure Score analysis and security recommendations
-- **🌐 Exposure Analysis**: Identify publicly accessible resources and network security groups
-- **👥 Identity & Access Review**: User management, MFA status, and role assignments
-- **📋 Policy Compliance**: Azure Policy assignments and compliance monitoring
-- **📊 Interactive Dashboard**: Real-time security metrics and visualizations
-- **📄 Comprehensive Reports**: Generate PDF and Markdown security reports
-- **🐳 Docker Ready**: Single-command deployment with Docker Compose
+- **👥 Identity Analysis**: Comprehensive role assignment analysis by identity type (Users, Service Principals, Managed Identities, Groups)
+- **📊 Interactive Dashboard**: Real-time identity metrics with visual breakdowns and statistics
 - **🔐 Secure Authentication**: Azure Device Code Flow for secure tenant access
+- **⏰ Authentication Monitoring**: Token expiration tracking and status alerts
+- **🎯 Conditional Rendering**: Smart UI that adapts based on authentication state
+- **🛡️ Read-Only Access**: No modifications to Azure configurations
+- **🐳 Docker Ready**: Single-command deployment with Docker Compose
+- **⚡ Real-time Updates**: Live data loading and error handling
 
 ## 🏗️ Architecture
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   React Frontend │    │  FastAPI Backend │    │  PostgreSQL DB  │
-│   (Port 3000)   │◄──►│   (Port 8000)   │◄──►│   (Port 5432)   │
+│   React Frontend │    │  FastAPI Backend │    │   Azure APIs    │
+│   (Port 3000)   │◄──►│   (Port 8000)   │◄──►│   (Read-Only)   │
+│                 │    │                 │    │                 │
+│ • Dashboard     │    │ • Auth Status   │    │ • Graph API     │
+│ • Identity Tab  │    │ • Identity Scan │    │ • ARM API       │
+│ • Conditional   │    │ • Role Analysis │    │ • Identity API  │
+│   Rendering     │    │ • Device Code   │    │                 │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                        │                        │
-         └────────────────────────┼────────────────────────┘
-                                  │
-                     ┌─────────────────┐
-                     │   Azure APIs    │
-                     │   (Read-Only)   │
-                     └─────────────────┘
 ```
 
 ## 🚀 Quick Start
@@ -34,118 +32,127 @@ Azure Recon is a comprehensive security posture assessment tool for Microsoft Az
 ### Prerequisites
 
 - Docker and Docker Compose
-- Azure tenant with Reader-level access
+- Azure tenant with appropriate permissions for identity analysis
 - Internet connection for Azure API access
 
-### 1. Clone and Configure
+### 1. Clone and Start
 
 ```bash
-git clone <repository-url>
-cd azure-recon
+git clone https://github.com/wardspan/azure_recon.git
+cd azure_recon
 
-# Copy and configure environment variables
-cp .env.example .env
-```
-
-### 2. Configure Environment
-
-Edit `.env` file with your settings:
-
-```bash
-# Azure Configuration (optional - uses device code flow)
-AZURE_TENANT_ID=your-tenant-id-here
-
-# Database Configuration
-POSTGRES_PASSWORD=your-secure-database-password
-
-# Application Security
-SECRET_KEY=your-super-secret-key-change-me
-
-# Optional: Customize ports
-FRONTEND_PORT=3000
-```
-
-### 3. Launch Application
-
-```bash
 # Start all services
 docker-compose up -d
+```
 
+### 2. Environment Configuration (Optional)
+
+The application works out of the box with device code authentication. For custom configuration, create a `.env` file:
+
+```bash
+# Optional: Custom ports
+FRONTEND_PORT=3000
+BACKEND_PORT=8000
+
+# Optional: Azure tenant ID (will be obtained during auth flow)
+AZURE_TENANT_ID=your-tenant-id-here
+```
+
+### 3. Access and Monitor
+
+```bash
 # View logs
 docker-compose logs -f
 
 # Check service health
 docker-compose ps
+
+# Rebuild after code changes
+docker-compose down && docker-compose up -d --build
 ```
 
 ### 4. Access the Application
 
 - **Web Interface**: http://localhost:3000
-- **API Documentation**: http://localhost:3000/api/docs
-- **Health Check**: http://localhost:3000/health
+- **API Documentation**: http://localhost:8000/docs
+- **Backend API**: Internal Docker network (port 8000)
 
 ## 🔐 Authentication Flow
 
-1. Navigate to the web interface
-2. Click "Sign in with Azure"
-3. Follow the device code authentication prompt:
+1. Navigate to http://localhost:3000
+2. Click on the "Identity" tab
+3. If not authenticated, you'll see a login prompt with "Start Login" button
+4. Click "Start Login" to initiate Azure Device Code flow:
    - Visit the provided URL (e.g., https://microsoft.com/devicelogin)
-   - Enter the device code
+   - Enter the device code shown in the application
    - Sign in with your Azure account
-   - Grant read permissions
-4. Return to the application - you'll be automatically logged in
+   - Grant the requested permissions
+5. Return to the application - data will load automatically after successful authentication
 
-## 📊 Using the Dashboard
+## 📊 Using the Identity Dashboard
 
-### Running Security Scans
+### Identity Analysis Features
 
-1. Click **"Run Scan"** button on the dashboard
-2. Wait for the scan to complete (typically 2-5 minutes)
-3. Review results in the dashboard cards and tables
-4. Generate reports as needed
+The Identity tab provides comprehensive role assignment analysis with the following features:
 
-### Dashboard Sections
+- **🔐 Authentication Status**: Real-time authentication monitoring with token expiration warnings
+- **👥 Identity Categorization**: Automatic grouping by type (Users, Service Principals, Managed Identities, Groups, Unknown/Deleted)
+- **📊 Visual Statistics**: Progress bars showing role assignment distribution
+- **🎯 Top Role Assignments**: Most common roles per identity type
+- **⚡ Real-time Loading**: Live data updates with error handling and retry mechanisms
 
-- **📈 Score Cards**: Key security metrics at a glance
-- **🎯 Recommendations**: Prioritized security improvements
-- **🌐 Public Resources**: Internet-facing assets analysis
-- **👥 Identity Review**: User and access management insights
-- **📋 Policy Compliance**: Governance and compliance status
+### Application States
 
-### Report Generation
+- **Not Authenticated**: Warning banner with "Start Login" button for device code flow
+- **Loading**: Spinner with progress messages during data retrieval
+- **Error**: Error display with retry functionality for failed requests
+- **No Data**: Informative message when no role assignments are found
+- **Data Available**: Rich visualization of role assignments with interactive cards
 
-- **Markdown Reports**: Human-readable format for documentation
-- **PDF Reports**: Professional format for stakeholders
-- **Raw Data Export**: JSON format for integration
+### Identity Types Analyzed
+
+- **👤 Users**: Azure AD user accounts and their role assignments
+- **🤖 Service Principals**: Application registrations and service accounts
+- **🔧 Managed Identities**: System and user-assigned managed identities
+- **👥 Groups**: Security and distribution groups with role assignments
+- **❓ Unknown/Deleted**: Orphaned role assignments from deleted principals
 
 ## 🔧 API Endpoints
 
 ### Authentication
 
-- `POST /api/login` - Initiate device code flow
-- `POST /api/auth/complete` - Complete authentication
-- `GET /api/auth/status` - Check authentication status
+- `GET /api/auth/status` - Check authentication status with token expiration info
+- `POST /api/auth/device-code` - Initiate Azure device code authentication flow
 
-### Scanning
+### Identity Analysis
 
-- `POST /api/scan` - Run comprehensive security scan
-- `GET /api/scan/latest` - Get most recent scan results
-- `GET /api/subscriptions` - List accessible subscriptions
+- `GET /api/scan/identity` - Get detailed role assignment analysis (requires authentication)
+  - Returns structured data grouped by identity type
+  - Includes principal IDs, role names, scopes, and assignment details
 
-### Data Modules
+### Response Models
 
-- `GET /api/secure_score` - Microsoft Defender secure score
-- `GET /api/recommendations` - Security recommendations
-- `GET /api/exposure` - Public resources and NSGs
-- `GET /api/identity` - Users and identity information
-- `GET /api/roles` - Role assignments
-- `GET /api/policy` - Policy assignments
-- `GET /api/compliance` - Compliance results
+**AuthStatus**
 
-### Reporting
+```json
+{
+  "authenticated": true,
+  "tenant_id": "your-tenant-id",
+  "expires_in_minutes": 45
+}
+```
 
-- `POST /api/report` - Generate security report
-- `GET /api/reports` - List generated reports
+**IdentityScanResult**
+
+```json
+{
+  "users": [{"principal_id": "...", "roles": [...], "type": "User"}],
+  "service_principals": [...],
+  "managed_identities": [...],
+  "groups": [...],
+  "unknown_or_deleted": [...]
+}
+```
 
 ## 🛠️ Development
 
@@ -168,80 +175,78 @@ npm run dev
 ### Project Structure
 
 ```
-azure-recon/
+azure_recon/
 ├── backend/                 # FastAPI application
-│   ├── main.py             # Main application entry
-│   ├── auth.py             # Azure authentication
-│   ├── secure_score.py     # Defender integration
-│   ├── exposure.py         # Network analysis
-│   ├── identity.py         # Identity management
-│   ├── policy.py           # Policy compliance
-│   ├── reporting.py        # Report generation
-│   └── models.py           # Data models
-├── frontend/               # React application
+│   ├── main.py             # Main application with auth and identity endpoints
+│   ├── models.py           # Pydantic models for API responses
+│   ├── role_analysis.py    # Azure role assignment analysis logic
+│   └── requirements.txt    # Python dependencies
+├── frontend/               # React TypeScript application
 │   ├── src/
-│   │   ├── components/     # Reusable components
-│   │   ├── pages/          # Application pages
-│   │   ├── services/       # API integration
-│   │   └── contexts/       # React contexts
-│   └── public/
-├── templates/              # Report templates
-├── reports/                # Generated reports
+│   │   ├── components/     # React components
+│   │   │   ├── EnhancedIdentityBreakdown.tsx  # Main identity component
+│   │   │   └── IdentityBreakdown.tsx         # Legacy component
+│   │   ├── pages/
+│   │   │   └── Dashboard.tsx    # Main dashboard with tabs
+│   │   └── services/
+│   │       └── api.ts           # API client and TypeScript interfaces
+│   ├── package.json
+│   └── tailwind.config.js
 ├── docker-compose.yml      # Container orchestration
 ├── Dockerfile.backend      # Backend container
 ├── Dockerfile.frontend     # Frontend container
-└── .env                    # Environment configuration
+└── .gitignore
 ```
 
 ## 🔒 Security Considerations
 
 ### Permissions Required
 
-- **Azure Reader** role at tenant/subscription level
-- **Security Reader** role for Microsoft Defender data
-- **Directory Reader** role for identity information
+- **Reader** role at subscription level for role assignment analysis
+- **Directory Reader** role for Azure AD identity information
+- **User.Read** Microsoft Graph permission for user details
 
 ### Data Handling
 
-- No Azure configurations are modified (read-only access)
-- Scan data stored locally in PostgreSQL database
-- Reports contain sensitive information - handle accordingly
-- Authentication tokens are managed securely
+- Read-only access to Azure resources (no modifications)
+- Authentication tokens stored temporarily during session
+- All data processed locally within Docker containers
+- No persistent storage of Azure data
 
 ### Network Security
 
-- All API calls use HTTPS to Azure endpoints
-- Web interface served over HTTP (use reverse proxy for HTTPS in production)
-- Database access restricted to application containers
+- All Azure API calls use HTTPS
+- Frontend served over HTTP (add reverse proxy for production HTTPS)
+- Backend API accessible only within Docker network
+- Device code authentication flow for secure access
 
 ## 🐳 Production Deployment
 
 ### Docker Compose Production
 
 ```bash
-# Production environment
-ENVIRONMENT=production docker-compose up -d
+# Production deployment
+docker-compose up -d --build
 
-# With custom configuration
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Monitor logs
+docker-compose logs -f
+
+# Health check
+docker-compose ps
 ```
 
 ### Environment Variables for Production
 
 ```bash
-# Security
-SECRET_KEY=your-production-secret-key
-POSTGRES_PASSWORD=secure-production-password
-REDIS_PASSWORD=secure-redis-password
-
-# Networking
+# Optional: Custom ports
 FRONTEND_PORT=80
-ALLOWED_HOSTS=your-domain.com,your-ip-address
+BACKEND_PORT=8000
 
-# Optional: Azure service principal (alternative to device code)
-AZURE_CLIENT_ID=your-app-registration-id
-AZURE_CLIENT_SECRET=your-client-secret
+# Optional: Azure configuration
 AZURE_TENANT_ID=your-tenant-id
+
+# Optional: Custom Docker settings
+COMPOSE_PROJECT_NAME=azure_recon
 ```
 
 ### Reverse Proxy Configuration (nginx)
@@ -261,6 +266,14 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
+
+    location /api/ {
+        proxy_pass http://localhost:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
 }
 ```
 
@@ -274,17 +287,17 @@ server {
 # Check Azure permissions
 az role assignment list --assignee your-user-id
 
-# Verify network connectivity
+# Verify backend logs for auth errors
 docker-compose logs backend
 ```
 
-**Scan Errors**
+**Identity Scan Errors**
 
 ```bash
 # Check subscription access
-az account list --all
+az account show
 
-# Review backend logs
+# Review detailed backend logs
 docker-compose logs -f backend
 ```
 
@@ -296,19 +309,35 @@ docker-compose ps
 
 # Verify port availability
 netstat -an | grep 3000
+
+# Check frontend build logs
+docker-compose logs frontend
+```
+
+**Role Assignment Issues**
+
+```bash
+# Verify Azure permissions
+az role assignment list --all --query "[?principalId=='<your-user-id>']"
+
+# Check for API throttling or rate limiting
+docker-compose logs backend | grep -i "error\|exception"
 ```
 
 ### Health Checks
 
 ```bash
-# Application health
-curl http://localhost:3000/health
+# Check all containers
+docker-compose ps
 
-# API health
-curl http://localhost:3000/api/health
+# Frontend accessibility
+curl http://localhost:3000
 
-# Database connectivity
-docker-compose exec database psql -U azure_recon -c "SELECT 1;"
+# Backend API docs
+curl http://localhost:8000/docs
+
+# Authentication status
+curl http://localhost:8000/api/auth/status
 ```
 
 ## 📝 License
@@ -331,15 +360,27 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🎯 Roadmap
 
-- [ ] Multi-tenant support
-- [ ] Scheduled scan automation
-- [ ] Custom policy definitions
-- [ ] Integration with SIEM systems
-- [ ] Advanced threat detection
-- [ ] Compliance framework mapping (SOC2, ISO27001, etc.)
+- [ ] Additional identity analysis features (privilege escalation paths, orphaned permissions)
+- [ ] Role assignment timeline and change tracking
+- [ ] Export functionality for identity data (CSV, JSON, PDF reports)
+- [ ] Multi-subscription support for enterprise environments
+- [ ] Custom role definition analysis
+- [ ] Integration with Microsoft Graph for enhanced identity insights
+- [ ] Automated role assignment recommendations
+- [ ] Compliance reporting for identity governance frameworks
+
+## 🏗️ Current Implementation Status
+
+- ✅ **Authentication**: Azure Device Code flow with token expiration tracking
+- ✅ **Identity Analysis**: Role assignment categorization by identity type
+- ✅ **Frontend**: React TypeScript with conditional rendering and error handling
+- ✅ **Backend**: FastAPI with Azure SDK integration
+- ✅ **Docker**: Containerized deployment with Docker Compose
+- ⏳ **Testing**: End-to-end authentication flow testing in progress
+- ⏳ **Documentation**: API documentation and user guides
 
 ---
 
-**⚠️ Important**: This tool provides security assessments based on available data and configurations. Always validate findings and follow your organization's security policies when implementing changes.
+**⚠️ Important**: This tool provides identity and role assignment analysis for Azure environments. It requires appropriate Azure permissions and should be used in accordance with your organization's security policies. All access is read-only and no Azure configurations are modified.
 
-Built with ❤️ for Azure security professionals.
+Built for Azure identity security analysis and reconnaissance.
