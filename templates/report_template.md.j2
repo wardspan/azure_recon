@@ -1,0 +1,269 @@
+# 🔒 Azure Recon Security Assessment Report
+
+**Tenant ID:** {{ tenant_id }}  
+**Generated:** {{ generated_at | datetime }}  
+**Scan Timestamp:** {{ scan_timestamp | datetime }}
+
+---
+
+## 📊 Executive Summary
+
+| Metric | Value |
+|--------|-------|
+| **Secure Score** | {{ secure_score.current_score }}/{{ secure_score.max_score }} ({{ secure_score.percentage | percentage }}) |
+| **Total Recommendations** | {{ total_recommendations }} |
+| **Critical Issues** | {{ critical_severity_recommendations }} |
+| **High Priority Issues** | {{ high_severity_recommendations }} |
+| **Public Resources** | {{ total_public_resources }} |
+| **High-Risk NSGs** | {{ high_risk_nsgs }} |
+| **Total Users** | {{ total_users }} |
+| **Guest Users** | {{ guest_users }} |
+| **Users without MFA** | {{ users_without_mfa }} |
+
+---
+
+## 🛡️ Microsoft Defender for Cloud
+
+### Secure Score Details
+- **Current Score:** {{ secure_score.current_score }}
+- **Maximum Possible:** {{ secure_score.max_score }}
+- **Percentage:** {{ secure_score.percentage | percentage }}
+
+### Control Scores by Subscription
+{% for control in secure_score.control_scores %}
+| Subscription | Control | Score | Max | Percentage |
+|--------------|---------|-------|-----|------------|
+| {{ control.subscription_id }} | {{ control.display_name }} | {{ control.current_score }} | {{ control.max_score }} | {{ control.percentage | percentage }} |
+{% endfor %}
+
+---
+
+## ⚠️ Security Recommendations
+
+### Summary by Severity
+{% set severity_counts = {} %}
+{% for rec in recommendations %}
+  {% if severity_counts.update({rec.severity: severity_counts.get(rec.severity, 0) + 1}) %}{% endif %}
+{% endfor %}
+
+| Severity | Count |
+|----------|-------|
+{% for severity, count in severity_counts.items() %}
+| {{ severity }} | {{ count }} |
+{% endfor %}
+
+### Top Priority Recommendations
+{% for recommendation in recommendations[:10] %}
+
+#### {{ recommendation.severity }} - {{ recommendation.name }}
+- **Category:** {{ recommendation.category }}
+- **State:** {{ recommendation.state }}
+- **Affected Resources:** {{ recommendation.affected_resources }}
+- **Description:** {{ recommendation.description }}
+
+{% endfor %}
+
+---
+
+## 🌐 Public Resource Exposure
+
+### Summary
+- **Total Public Resources:** {{ total_public_resources }}
+- **Resource Types:** {% set resource_types = public_resources | map(attribute='resource_type') | unique | list %}{{ resource_types | join(', ') }}
+
+### Public Resources Inventory
+{% for resource in public_resources %}
+
+#### {{ resource.resource_name }} ({{ resource.resource_type }})
+- **Public IP:** {{ resource.public_ip or 'N/A' }}
+- **Ports:** {{ resource.ports | join(', ') if resource.ports else 'N/A' }}
+- **Protocols:** {{ resource.protocols | join(', ') if resource.protocols else 'N/A' }}
+- **Subscription:** {{ resource.subscription_id }}
+- **Resource Group:** {{ resource.resource_group }}
+
+{% endfor %}
+
+---
+
+## 🔒 Network Security Groups Analysis
+
+### Risk Summary
+{% set nsg_risk_counts = {} %}
+{% for nsg in network_security_groups %}
+  {% if nsg_risk_counts.update({nsg.risk_level: nsg_risk_counts.get(nsg.risk_level, 0) + 1}) %}{% endif %}
+{% endfor %}
+
+| Risk Level | Count |
+|------------|-------|
+{% for risk_level, count in nsg_risk_counts.items() %}
+| {{ risk_level }} | {{ count }} |
+{% endfor %}
+
+### High-Risk Network Security Groups
+{% for nsg in network_security_groups %}
+{% if nsg.risk_level == 'High' %}
+
+#### {{ nsg.name }} - {{ nsg.risk_level }} Risk
+- **Location:** {{ nsg.location }}
+- **Resource Group:** {{ nsg.resource_group }}
+- **Subscription:** {{ nsg.subscription_id }}
+
+**Risky Rules:**
+{% for rule in nsg.rules %}
+{% if rule.access == 'Allow' and rule.direction == 'Inbound' and rule.source_address_prefix in ['*', '0.0.0.0/0', 'Internet'] %}
+- **{{ rule.name }}**: {{ rule.protocol }} {{ rule.destination_port_range }} from {{ rule.source_address_prefix }}
+{% endif %}
+{% endfor %}
+
+{% endif %}
+{% endfor %}
+
+---
+
+## 👥 Identity and Access Management
+
+### User Summary
+- **Total Users:** {{ total_users }}
+- **Guest Users:** {{ guest_users }}
+- **Users without MFA:** {{ users_without_mfa }}
+
+### Users Without MFA
+{% for user in users %}
+{% if not user.mfa_enabled %}
+- **{{ user.display_name }}** ({{ user.user_principal_name }}) {% if user.is_guest %}[GUEST]{% endif %}
+{% endif %}
+{% endfor %}
+
+### Guest Users
+{% for user in users %}
+{% if user.is_guest %}
+- **{{ user.display_name }}** ({{ user.user_principal_name }})
+{% endif %}
+{% endfor %}
+
+---
+
+## 🔐 Role Assignments
+
+### Summary
+- **Total Role Assignments:** {{ total_role_assignments }}
+- **Privileged Assignments:** {{ privileged_assignments }}
+
+### Privileged Role Assignments
+{% for assignment in role_assignments %}
+{% if 'admin' in assignment.role_definition_name.lower() or 'owner' in assignment.role_definition_name.lower() or 'contributor' in assignment.role_definition_name.lower() %}
+
+#### {{ assignment.role_definition_name }}
+- **Principal:** {{ assignment.principal_name }} ({{ assignment.principal_type }})
+- **Scope:** {{ assignment.scope }}
+- **Subscription:** {{ assignment.subscription_id or 'N/A' }}
+
+{% endif %}
+{% endfor %}
+
+---
+
+## 📋 Policy Compliance
+
+### Summary
+- **Total Policy Assignments:** {{ total_policy_assignments }}
+- **Non-Compliant Resources:** {{ non_compliant_resources }}
+- **Compliance Rate:** {{ ((compliance_results | length - non_compliant_resources) / compliance_results | length * 100) | round(1) if compliance_results else 0 }}%
+
+### Policy Assignments
+{% for assignment in policy_assignments %}
+
+#### {{ assignment.display_name }}
+- **Enforcement Mode:** {{ assignment.enforcement_mode }}
+- **Scope:** {{ assignment.scope }}
+- **Policy Definition:** {{ assignment.policy_definition_id.split('/')[-1] if '/' in assignment.policy_definition_id else assignment.policy_definition_id }}
+
+{% endfor %}
+
+### Non-Compliant Resources
+{% for result in compliance_results %}
+{% if result.compliance_state != 'Compliant' %}
+
+#### {{ result.resource_id.split('/')[-1] if '/' in result.resource_id else result.resource_id }}
+- **Resource Type:** {{ result.resource_type }}
+- **Location:** {{ result.resource_location }}
+- **Policy:** {{ result.policy_assignment_name }}
+- **Compliance State:** {{ result.compliance_state }}
+
+{% endif %}
+{% endfor %}
+
+---
+
+## 🔍 Detailed Findings
+
+### Key Security Issues Identified
+
+1. **Authentication & Access Control**
+   - {{ users_without_mfa }} users without MFA enabled
+   - {{ guest_users }} guest users in the tenant
+   - {{ privileged_assignments }} privileged role assignments
+
+2. **Network Security**
+   - {{ total_public_resources }} resources with public IP addresses
+   - {{ high_risk_nsgs }} high-risk Network Security Groups
+   - {{ network_security_groups | length }} total NSGs analyzed
+
+3. **Policy Compliance**
+   - {{ non_compliant_resources }} non-compliant resources
+   - {{ ((compliance_results | length - non_compliant_resources) / compliance_results | length * 100) | round(1) if compliance_results else 0 }}% overall compliance rate
+
+4. **Security Recommendations**
+   - {{ critical_severity_recommendations }} critical severity issues
+   - {{ high_severity_recommendations }} high severity issues
+   - {{ total_recommendations }} total recommendations from Microsoft Defender
+
+---
+
+## 📈 Recommendations
+
+### Immediate Actions Required
+
+1. **Enable MFA for all users** - {{ users_without_mfa }} users currently without MFA
+2. **Review guest user access** - {{ guest_users }} guest users should be audited
+3. **Address critical security findings** - {{ critical_severity_recommendations }} critical issues need immediate attention
+4. **Review privileged access** - {{ privileged_assignments }} privileged role assignments should be validated
+5. **Secure public resources** - {{ total_public_resources }} resources are publicly accessible
+
+### Long-term Security Improvements
+
+1. **Improve Secure Score** - Current score is {{ secure_score.percentage | percentage }}
+2. **Implement Zero Trust principles**
+3. **Regular access reviews and certifications**
+4. **Enhanced monitoring and alerting**
+5. **Security awareness training for users**
+
+---
+
+## 📚 Appendix
+
+### Scan Methodology
+This assessment was performed using Azure Reader-level permissions to enumerate:
+- Microsoft Defender for Cloud secure scores and recommendations
+- Public IP addresses and network configurations
+- Identity and access management settings
+- Azure Policy assignments and compliance states
+- Network Security Group configurations
+
+### Limitations
+- Read-only assessment; no configuration changes were made
+- Some advanced security features may require additional permissions to assess
+- Results are point-in-time and should be validated with current configurations
+
+### Next Steps
+1. Review and prioritize findings based on business impact
+2. Create remediation plan with timelines
+3. Implement security controls and monitoring
+4. Schedule regular security assessments
+5. Track progress against security metrics
+
+---
+
+**Report Generated by AzureRecon** | {{ generated_at | datetime }}
+
+*This report contains sensitive security information and should be handled according to your organization's data classification policies.*

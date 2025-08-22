@@ -1,0 +1,37 @@
+# Node.js
+frontend/node_modules/
+frontend/dist/
+frontend/.next/
+
+# Backend
+backend/__pycache__/
+backend/.pytest_cache/
+backend/*.pyc
+backend/*.pyo
+
+# General
+.git/
+.gitignore
+.DS_Store
+*.log
+*.tmp
+*.temp
+
+# Reports and data
+reports/*.md
+reports/*.pdf
+
+# Local development
+.env.local
+.env.development
+.env.test
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+Thumbs.db
+*.DS_Store

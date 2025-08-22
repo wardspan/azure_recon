@@ -1,0 +1,82 @@
+# OS & Editors
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+*.code-workspace
+
+# Python (backend)
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+*.egg
+build/
+dist/
+.site/
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.cache/
+venv/
+.venv/
+pip-wheel-metadata/
+.pyre/
+
+# Node/Frontend
+node_modules/
+dist/
+coverage/
+.eslintcache
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+.yarn/
+.pnp.*
+.parcel-cache/
+.turbo/
+
+# Env & Secrets
+.env
+.env.*
+!.env.example
+.envrc
+*.local
+*.key
+*.pem
+
+# Reports & Generated Artifacts
+reports/*
+!reports/.gitkeep
+
+# Logs & Temp
+*.log
+logs/
+tmp/
+backend/*.log
+frontend/*.log
+
+# Docker (local data mounts, if created)
+docker-data/
+
+# AI / LLM tooling & artifacts
+.claude/
+.aider*
+.cursor/
+.cursorrules
+.openai*/
+.anthropic*/
+.chatgpt*/
+.gptcache/
+.copilot/
+.codeium/
+

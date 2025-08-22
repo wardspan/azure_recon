@@ -1,0 +1,137 @@
+services:
+  # PostgreSQL Database for storing scan history
+  database:
+    image: postgres:15-alpine
+    container_name: azure-recon-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-azure_recon}
+      POSTGRES_USER: ${POSTGRES_USER:-azure_recon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password_change_me}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - azure-recon-network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-azure_recon}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: azure-recon-backend
+    restart: unless-stopped
+    environment:
+      # Database configuration
+      DATABASE_URL: postgresql://${POSTGRES_USER:-azure_recon}:${POSTGRES_PASSWORD:-secure_password_change_me}@database:5432/${POSTGRES_DB:-azure_recon}
+
+      # Azure configuration
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:-}
+      AZURE_TENANT_ID: ${AZURE_TENANT_ID:-}
+
+      # Application configuration
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+      # Security
+      SECRET_KEY: ${SECRET_KEY:-your-super-secret-key-change-me}
+    volumes:
+      - reports_data:/app/reports
+      - templates_data:/app/templates
+      - ~/.azure:/home/appuser/.azure
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - azure-recon-network
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # React Frontend (served by nginx)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: azure-recon-frontend
+    restart: unless-stopped
+    ports:
+      - '${FRONTEND_PORT:-3000}:80'
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - azure-recon-network
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Redis for caching (optional but recommended)
+  redis:
+    image: redis:7-alpine
+    container_name: azure-recon-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_password_change_me}
+    volumes:
+      - redis_data:/data
+    networks:
+      - azure-recon-network
+    healthcheck:
+      test: ['CMD', 'redis-cli', '--raw', 'incr', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Azure CLI service for interactive login
+  cli:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: azure-recon-cli
+    profiles: ['cli']
+    environment:
+      # Azure configuration
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:-}
+      AZURE_TENANT_ID: ${AZURE_TENANT_ID:-}
+    volumes:
+      - ~/.azure:/home/appuser/.azure
+      - reports_data:/app/reports
+      - templates_data:/app/templates
+    networks:
+      - azure-recon-network
+    stdin_open: true
+    tty: true
+    user: root # Need root to write to mounted .azure directory
+    entrypoint: ['/bin/bash']
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  reports_data:
+    driver: local
+  templates_data:
+    driver: local
+
+networks:
+  azure-recon-network:
+    driver: bridge
+    name: azure-recon-network
